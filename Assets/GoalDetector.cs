@@ -20,12 +20,17 @@ public class GoalDetector : MonoBehaviour
     [SerializeField] private Transform playerRoot;
     [SerializeField] private Transform playerStartPosition;
 
+    [Header("Goalkeeper Reset")]
+    [SerializeField] private GoalkeeperAI goalkeeperAI;
+
     [Header("Goal UI")]
     [SerializeField] private TMP_Text goalMessage;
-    [SerializeField] private float goalDisplayDuration = 2f;
+    [SerializeField, Min(0f)] private float goalDisplayDuration = 2f;
 
     private bool goalAlreadyScored;
     private Coroutine resetRoutine;
+
+    public bool GoalAlreadyScored => goalAlreadyScored;
 
     private void Start()
     {
@@ -52,6 +57,9 @@ public class GoalDetector : MonoBehaviour
             goalMessage.transform.SetAsLastSibling();
         }
 
+        if (resetRoutine != null)
+            StopCoroutine(resetRoutine);
+
         resetRoutine = StartCoroutine(ResetAfterGoal());
     }
 
@@ -73,26 +81,53 @@ public class GoalDetector : MonoBehaviour
         float minX = Mathf.Min(left.x, right.x);
         float maxX = Mathf.Max(left.x, right.x);
 
-        return ball.x > minX &&
-               ball.x < maxX &&
-               ball.y < bar.y;
+        float ballRadius = 0.11f;
+
+        if (ballRigidbody != null)
+        {
+            SphereCollider sphere =
+                ballRigidbody.GetComponent<SphereCollider>();
+
+            if (sphere != null)
+            {
+                Vector3 scale = sphere.transform.lossyScale;
+                ballRadius = sphere.radius *
+                    Mathf.Max(scale.x, scale.y, scale.z);
+            }
+        }
+
+        return ball.x > minX + ballRadius &&
+               ball.x < maxX - ballRadius &&
+               ball.y < bar.y - ballRadius;
     }
 
     private IEnumerator ResetAfterGoal()
     {
-        // Let the player see the goal message.
         yield return new WaitForSecondsRealtime(goalDisplayDuration);
 
+        ResetRound();
+
+        resetRoutine = null;
+
+        Debug.Log("Ready for the next penalty!");
+    }
+
+    /// <summary>
+    /// Resets the ball, player, goalkeeper, and goal UI.
+    /// Can also be called by GoalkeeperAI after a missed or saved shot.
+    /// </summary>
+    public void ResetRound()
+    {
         ResetBall();
         ResetPlayer();
+
+        if (goalkeeperAI != null)
+            goalkeeperAI.ResetGoalkeeper();
 
         if (goalMessage != null)
             goalMessage.gameObject.SetActive(false);
 
         goalAlreadyScored = false;
-        resetRoutine = null;
-
-        Debug.Log("Ready for the next penalty!");
     }
 
     private void ResetBall()
@@ -100,7 +135,7 @@ public class GoalDetector : MonoBehaviour
         if (ballRigidbody == null || ballStartPosition == null)
         {
             Debug.LogWarning(
-                "GoalDetector: Assign the ball Rigidbody and ball start position."
+                "GoalDetector: Assign Ball Rigidbody and Ball Start Position."
             );
             return;
         }
@@ -119,12 +154,11 @@ public class GoalDetector : MonoBehaviour
         if (playerRoot == null || playerStartPosition == null)
         {
             Debug.LogWarning(
-                "GoalDetector: Assign the player root and player start position."
+                "GoalDetector: Assign Player Root and Player Start Position."
             );
             return;
         }
 
-        // Temporarily disable a CharacterController if one is present.
         CharacterController characterController =
             playerRoot.GetComponent<CharacterController>();
 

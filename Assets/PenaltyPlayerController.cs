@@ -48,6 +48,7 @@ public class PenaltyPlayerController : MonoBehaviour
 
     public event System.Action<bool, float> OnShotQualityEvaluated;
 
+
     [Header("Power Timing")]
     [SerializeField] private float powerCycleDuration = 2f;
     [SerializeField] private bool startAtRandomPower = false;
