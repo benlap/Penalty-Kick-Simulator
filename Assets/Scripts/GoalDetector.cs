@@ -5,6 +5,9 @@ using UnityEngine;
 
 public class GoalDetector : MonoBehaviour
 {
+    [SerializeField]
+    private PenaltyGameStateController gameStateController;
+
     [Header("Goal Bounds")]
     [SerializeField] private Transform leftPost;
     [SerializeField] private Transform rightPost;
@@ -128,25 +131,32 @@ public class GoalDetector : MonoBehaviour
             goalMessage.gameObject.SetActive(false);
 
         goalAlreadyScored = false;
+
+        gameStateController.ShowPlayerKick();
     }
 
     private void ResetBall()
     {
         if (ballRigidbody == null || ballStartPosition == null)
-        {
-            Debug.LogWarning(
-                "GoalDetector: Assign Ball Rigidbody and Ball Start Position."
-            );
             return;
-        }
 
+        // Prevent physics from moving the ball during reset.
+        ballRigidbody.isKinematic = true;
+
+        // Clear any residual motion.
         ballRigidbody.linearVelocity = Vector3.zero;
         ballRigidbody.angularVelocity = Vector3.zero;
 
+        // Restore the exact starting transform.
         ballRigidbody.position = ballStartPosition.position;
         ballRigidbody.rotation = ballStartPosition.rotation;
 
-        ballRigidbody.Sleep();
+        // Ensure the ball has no residual motion.
+        ballRigidbody.linearVelocity = Vector3.zero;
+        ballRigidbody.angularVelocity = Vector3.zero;
+
+        // Synchronize physics transforms.
+        Physics.SyncTransforms();
     }
 
     private void ResetPlayer()

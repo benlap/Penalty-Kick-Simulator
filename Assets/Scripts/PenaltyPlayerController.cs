@@ -11,8 +11,10 @@ public class PenaltyPlayerController : MonoBehaviour
         Kicking,
         ShotTaken
     }
+    
 
     [Header("References")]
+    [SerializeField] private PenaltyGameStateController gameStateController;
     [SerializeField] private Camera aimCamera;
     [SerializeField] private Transform ball;
     [SerializeField] private Rigidbody ballRigidbody;
@@ -265,11 +267,20 @@ public class PenaltyPlayerController : MonoBehaviour
             yield break;
         }
 
+        gameStateController.ShowGoalMade();
+
         ballRigidbody.isKinematic = false;
+
         ballRigidbody.linearVelocity = Vector3.zero;
         ballRigidbody.angularVelocity = Vector3.zero;
 
         Vector3 direction = (aimPoint - ball.position).normalized;
+
+        // Apply the new shot velocity.
+        ballRigidbody.linearVelocity = direction * shotSpeed;
+        ballRigidbody.angularVelocity =
+            Vector3.Cross(Vector3.up, direction) * shotSpeed * 0.8f;
+
 
         // Give the shot a minimum upward component so it
         // doesn't travel flat into the ground.
@@ -290,6 +301,8 @@ public class PenaltyPlayerController : MonoBehaviour
 
         kickRoutine = null;
     }
+
+    
 
     private void UpdateAimVisuals(bool visible)
     {
