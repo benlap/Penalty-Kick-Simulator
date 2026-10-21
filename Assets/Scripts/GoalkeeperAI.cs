@@ -214,6 +214,7 @@ public class GoalkeeperAI : MonoBehaviour
 
         if (goalDetector != null)
         {
+            goalDetector.RegisterMiss();
             goalDetector.ResetRound();
         }
         else

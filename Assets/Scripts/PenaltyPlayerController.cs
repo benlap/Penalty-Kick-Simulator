@@ -73,6 +73,12 @@ public class PenaltyPlayerController : MonoBehaviour
     [Header("Input")]
     [SerializeField] private int shootMouseButton = 0;
     [SerializeField] private bool lockCursor = false;
+    [SerializeField] private bool inputEnabled = true;
+
+    public void SetInputEnabled(bool enabled)
+    {
+        inputEnabled = enabled;
+    }
 
     public PlayerState State { get; private set; } = PlayerState.Ready;
     public float CurrentPower01 { get; private set; }
@@ -121,6 +127,9 @@ public class PenaltyPlayerController : MonoBehaviour
 
     private void Update()
     {
+        if (!inputEnabled)
+            return;
+
         if (State == PlayerState.Kicking ||
             State == PlayerState.ShotTaken)
         {

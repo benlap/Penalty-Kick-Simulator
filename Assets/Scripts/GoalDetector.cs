@@ -30,6 +30,14 @@ public class GoalDetector : MonoBehaviour
     [SerializeField] private TMP_Text goalMessage;
     [SerializeField, Min(0f)] private float goalDisplayDuration = 2f;
 
+    [Header("Crowd Audio")]
+    [SerializeField] private AudioSource crowdAudioSource;
+    [SerializeField] private AudioClip crowdCheerSFX;
+    [SerializeField] private AudioClip crowdBooSFX;
+
+    [SerializeField, Range(0f, 1f)]
+    private float crowdVolume = 1f;
+
     private bool goalAlreadyScored;
     private Coroutine resetRoutine;
 
@@ -53,6 +61,8 @@ public class GoalDetector : MonoBehaviour
 
         Debug.Log("GOAL!");
 
+        PlayCrowdReaction(true);
+
         if (goalMessage != null)
         {
             goalMessage.text = "GOAL!";
@@ -64,6 +74,14 @@ public class GoalDetector : MonoBehaviour
             StopCoroutine(resetRoutine);
 
         resetRoutine = StartCoroutine(ResetAfterGoal());
+    }
+
+    public void RegisterMiss()
+    {
+        if (goalAlreadyScored)
+            return;
+
+        PlayCrowdReaction(false);
     }
 
     private bool IsInsideGoal(Vector3 ballPosition)
@@ -199,5 +217,16 @@ public class GoalDetector : MonoBehaviour
 
         if (goalMessage != null)
             goalMessage.gameObject.SetActive(false);
+    }
+
+    private void PlayCrowdReaction(bool goalScored)
+    {
+        if (crowdAudioSource == null)
+            return;
+
+        AudioClip clip = goalScored ? crowdCheerSFX : crowdBooSFX;
+
+        if (clip != null)
+            crowdAudioSource.PlayOneShot(clip, crowdVolume);
     }
 }
