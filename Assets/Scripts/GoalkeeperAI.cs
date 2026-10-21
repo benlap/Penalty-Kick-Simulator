@@ -16,19 +16,19 @@ public class GoalkeeperAI : MonoBehaviour
 
     [SerializeField] private GoalDetector goalDetector;
 
-    [Header("Dive Targets")]
-    [SerializeField] private Transform leftDiveTarget;
-    [SerializeField] private Transform centerDiveTarget;
-    [SerializeField] private Transform rightDiveTarget;
-
     [Header("AI Settings")]
     [SerializeField, Min(0f)] private float reactionDelay = 0.2f;
     [SerializeField, Min(0.01f)] private float diveDuration = 0.35f;
     [SerializeField, Min(0f)] private float predictionTimeLimit = 2f;
-    [SerializeField, Min(0f)] private float saveReach = 0.8f;
 
-    [Tooltip("Random error added to the predicted target, in goal-local units.")]
-    [SerializeField, Range(0f, 1f)] private float aimError = 0.12f;
+    [Tooltip("Maximum horizontal distance the goalkeeper can move from its starting position, in meters.")]
+    [SerializeField, Min(0f)] private float maxDiveDistance = 1.5f;
+
+    [Tooltip("Random horizontal error added to the predicted ball position, in goal-local units.")]
+    [SerializeField, Min(0f)] private float aimError = 0.35f;
+
+    [Tooltip("Random multiplier applied to the calculated dive distance. Lower values make dives less accurate.")]
+    [SerializeField, Range(0f, 1f)] private float diveAccuracy = 0.85f;
 
     [Header("Round Reset")]
     [Tooltip("How long after a shot before resetting if no goal was detected.")]
@@ -38,7 +38,6 @@ public class GoalkeeperAI : MonoBehaviour
     [SerializeField] private Animator animator;
     [SerializeField] private string leftDiveTrigger = "DiveLeft";
     [SerializeField] private string rightDiveTrigger = "DiveRight";
-    [SerializeField] private string centerSaveTrigger = "SaveCenter";
 
     private Vector3 readyPosition;
     private Quaternion readyRotation;
@@ -95,16 +94,26 @@ public class GoalkeeperAI : MonoBehaviour
 
         if (TryPredictGoalPoint(out predictedPoint))
         {
+            // Add unpredictable horizontal error to the prediction.
             predictedPoint.x += Random.Range(-aimError, aimError);
-            predictedPoint.y += Random.Range(-aimError, aimError);
 
-            Transform target = ChooseDiveTarget(predictedPoint);
+            // Only use the ball's horizontal position to choose a dive.
+            float horizontalOffset =
+                predictedPoint.x -
+                goalPlane.InverseTransformPoint(readyPosition).x;
 
-            if (target != null)
-            {
-                TriggerDiveAnimation(predictedPoint);
-                yield return MoveToTarget(target);
-            }
+            // Scale the dive to simulate imperfect reactions.
+            horizontalOffset *= Random.Range(diveAccuracy, 1f);
+
+            horizontalOffset = Mathf.Clamp(
+                horizontalOffset,
+                -maxDiveDistance,
+                maxDiveDistance
+            );
+
+            TriggerDiveAnimation(horizontalOffset);
+
+            yield return MoveHorizontally(horizontalOffset);
         }
 
         diveRoutine = null;
@@ -120,10 +129,10 @@ public class GoalkeeperAI : MonoBehaviour
         Vector3 localVelocity =
             goalPlane.InverseTransformDirection(ballRigidbody.linearVelocity);
 
+        // Ball must be moving toward the goal plane.
         if (Mathf.Abs(localVelocity.z) < 0.01f)
             return false;
 
-        // Goal plane is local Z = 0.
         float timeToGoal = -localPosition.z / localVelocity.z;
 
         if (timeToGoal <= 0f || timeToGoal > predictionTimeLimit)
@@ -140,42 +149,36 @@ public class GoalkeeperAI : MonoBehaviour
         return true;
     }
 
-    private Transform ChooseDiveTarget(Vector3 predictedPoint)
-    {
-        if (predictedPoint.x < -saveReach)
-            return leftDiveTarget;
-
-        if (predictedPoint.x > saveReach)
-            return rightDiveTarget;
-
-        return centerDiveTarget;
-    }
-
-    private void TriggerDiveAnimation(Vector3 predictedPoint)
+    private void TriggerDiveAnimation(float horizontalOffset)
     {
         if (animator == null)
             return;
 
-        string trigger;
-
-        if (predictedPoint.x < -saveReach)
-            trigger = leftDiveTrigger;
-        else if (predictedPoint.x > saveReach)
-            trigger = rightDiveTrigger;
-        else
-            trigger = centerSaveTrigger;
+        string trigger = horizontalOffset < 0f
+            ? leftDiveTrigger
+            : rightDiveTrigger;
 
         if (!string.IsNullOrEmpty(trigger))
             animator.SetTrigger(trigger);
     }
 
-    private IEnumerator MoveToTarget(Transform target)
+    private IEnumerator MoveHorizontally(float horizontalOffset)
     {
         Vector3 startPosition = goalkeeperRoot.position;
-        Quaternion startRotation = goalkeeperRoot.rotation;
 
-        Vector3 endPosition = target.position;
-        Quaternion endRotation = target.rotation;
+        // Convert the horizontal goal-local offset into world space.
+        Vector3 worldOffset = goalPlane.right * horizontalOffset;
+
+        // Preserve the original height and depth exactly.
+        Vector3 endPosition = startPosition + worldOffset;
+        endPosition.y = startPosition.y;
+
+        // Prevent movement along the goal's depth axis.
+        Vector3 localStart = goalPlane.InverseTransformPoint(startPosition);
+        Vector3 localEnd = goalPlane.InverseTransformPoint(endPosition);
+        localEnd.z = localStart.z;
+        localEnd.y = localStart.y;
+        endPosition = goalPlane.TransformPoint(localEnd);
 
         float elapsed = 0f;
 
@@ -186,15 +189,17 @@ public class GoalkeeperAI : MonoBehaviour
             float t = Mathf.Clamp01(elapsed / diveDuration);
             t = t * t * (3f - 2f * t);
 
-            goalkeeperRoot.SetPositionAndRotation(
-                Vector3.Lerp(startPosition, endPosition, t),
-                Quaternion.Slerp(startRotation, endRotation, t)
-            );
+            goalkeeperRoot.position =
+                Vector3.Lerp(startPosition, endPosition, t);
+
+            // Keep the goalkeeper's original rotation.
+            goalkeeperRoot.rotation = readyRotation;
 
             yield return null;
         }
 
-        goalkeeperRoot.SetPositionAndRotation(endPosition, endRotation);
+        goalkeeperRoot.position = endPosition;
+        goalkeeperRoot.rotation = readyRotation;
         diveRoutine = null;
     }
 
@@ -204,8 +209,6 @@ public class GoalkeeperAI : MonoBehaviour
 
         roundResetRoutine = null;
 
-        // If the goal detector is already showing a goal,
-        // let its goal-display reset flow finish instead.
         if (goalDetector != null && goalDetector.GoalAlreadyScored)
             yield break;
 
@@ -261,9 +264,6 @@ public class GoalkeeperAI : MonoBehaviour
 
         if (!string.IsNullOrEmpty(rightDiveTrigger))
             animator.ResetTrigger(rightDiveTrigger);
-
-        if (!string.IsNullOrEmpty(centerSaveTrigger))
-            animator.ResetTrigger(centerSaveTrigger);
     }
 
     private void StopActiveCoroutines()

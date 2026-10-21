@@ -30,6 +30,14 @@ public class PenaltyPowerMeterUI : MonoBehaviour
     [SerializeField] private Color weakColor =
         new Color(1f, 0.4f, 0.35f);
 
+    [Header("Instructions")]
+    [SerializeField] private CanvasGroup instructionGroup;
+
+    [SerializeField]
+    private string instructionText =
+        "CLICK AND HOLD TO BUILD POWER\nRELEASE TO SHOOT";
+    [SerializeField] private TMPro.TMP_Text instructionLabel;
+
     private Coroutine feedbackRoutine;
 
     private void Awake()
@@ -43,6 +51,31 @@ public class PenaltyPowerMeterUI : MonoBehaviour
             shotFeedbackLabel.gameObject.SetActive(false);
 
         UpdateMeter(0f);
+
+        if (instructionLabel != null)
+            instructionLabel.text = instructionText;
+
+        ShowInstructions();
+    }
+
+    public void ShowInstructions()
+    {
+        if (instructionGroup != null)
+        {
+            instructionGroup.alpha = 1f;
+            instructionGroup.interactable = false;
+            instructionGroup.blocksRaycasts = false;
+        }
+    }
+
+    public void HideInstructions()
+    {
+        if (instructionGroup != null)
+        {
+            instructionGroup.alpha = 0f;
+            instructionGroup.interactable = false;
+            instructionGroup.blocksRaycasts = false;
+        }
     }
 
     private void OnEnable()
@@ -136,6 +169,8 @@ public class PenaltyPowerMeterUI : MonoBehaviour
         shotFeedbackLabel.gameObject.SetActive(true);
 
         feedbackRoutine = StartCoroutine(HideFeedback());
+
+        HideInstructions();
     }
 
     private IEnumerator HideFeedback()
@@ -146,6 +181,8 @@ public class PenaltyPowerMeterUI : MonoBehaviour
             shotFeedbackLabel.gameObject.SetActive(false);
 
         feedbackRoutine = null;
+
+        ShowInstructions();
     }
 
     private void SetVisible(bool visible)

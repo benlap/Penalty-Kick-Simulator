@@ -22,6 +22,9 @@ public class PenaltyPlayerController : MonoBehaviour
     [SerializeField] private Animator animator;
     [SerializeField] private Transform aimReticle;
     [SerializeField] private LineRenderer aimLine;
+    
+    [Header("Shot Power Audio")]
+    [SerializeField] private ShotPowerTickAudio shotPowerTickAudio;
 
     [Header("Goal Target Area")]
     [Tooltip("Half-width of the aimable area, in goal local units.")]
@@ -47,6 +50,11 @@ public class PenaltyPlayerController : MonoBehaviour
     public float LastShotPower01 { get; private set; }
     public float LastShotQuality01 { get; private set; }
     public bool LastShotWasPerfect { get; private set; }
+
+    [Header("Kick Audio")]
+    [SerializeField] private AudioSource kickAudioSource;
+    [SerializeField] private AudioClip kickSound;
+    [SerializeField, Range(0f, 1f)] private float kickVolume = 1f;
 
     public event System.Action<bool, float> OnShotQualityEvaluated;
 
@@ -215,6 +223,8 @@ public class PenaltyPlayerController : MonoBehaviour
         CurrentPower01 = cycle <= 1f
             ? cycle
             : 2f - cycle;
+
+        shotPowerTickAudio?.UpdatePower(CurrentPower01);
     }
 
     private void ReleaseShot()
@@ -258,6 +268,8 @@ public class PenaltyPlayerController : MonoBehaviour
 
     private IEnumerator PerformKick(float shotSpeed, Vector3 aimPoint)
     {
+        shotPowerTickAudio?.StopTicking();
+
         if (kickDelay > 0f)
             yield return new WaitForSeconds(kickDelay);
 
@@ -300,6 +312,9 @@ public class PenaltyPlayerController : MonoBehaviour
         OnShotTaken?.Invoke(shotSpeed, aimPoint);
 
         kickRoutine = null;
+
+        if (kickAudioSource != null && kickSound != null)
+            kickAudioSource.PlayOneShot(kickSound, kickVolume);
     }
 
     
