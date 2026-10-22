@@ -1,5 +1,7 @@
 # Penalty Kick Shooter
 
+[![Play Live Demo](https://img.shields.io/badge/Play-Live%20Demo-1f8b4c?style=for-the-badge&logo=googlechrome&logoColor=white)](https://benlap.github.io/Penalty-Kick-Simulator/)
+
 A playable soccer penalty kick experience developed as part of my YinzCam application. The project focuses on intuitive controls, skill-based gameplay, and polished presentation.
 
 ## Gameplay & Design
